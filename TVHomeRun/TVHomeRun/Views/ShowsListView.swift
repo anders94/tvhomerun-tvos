@@ -62,6 +62,7 @@ struct ShowsListView: View {
                 }
             }
         }
+        
         .navigationDestination(item: $selectedShow) { show in
             EpisodesListView(apiClient: apiClient, show: show)
         }
