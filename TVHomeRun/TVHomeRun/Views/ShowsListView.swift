@@ -14,6 +14,7 @@ struct ShowsListView: View {
     @State private var isLoading = true
     @State private var selectedShow: Show?
     @State private var showServerSettings = false
+    @Namespace private var showsNamespace
 
     var body: some View {
         ZStack {
@@ -49,8 +50,10 @@ struct ShowsListView: View {
                     }
                     .padding(60)
                 }
+                .prefersDefaultFocus(in: showsNamespace)
             }
         }
+        .focusScope(showsNamespace)
         .navigationTitle("TV HomeRun")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
