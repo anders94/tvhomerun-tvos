@@ -50,7 +50,7 @@ struct EpisodesListView: View {
         }
         .navigationTitle(show.title)
         .fullScreenCover(item: $selectedEpisode) { episode in
-            VideoPlayerView(episode: episode, allEpisodes: episodes)
+            VideoPlayerView(episode: episode, allEpisodes: episodes, apiClient: apiClient)
         }
         .alert("Connection Error", isPresented: $apiClient.showErrorAlert) {
             Button("OK") {
@@ -68,6 +68,14 @@ struct EpisodesListView: View {
         }
         .task {
             await loadEpisodes()
+        }
+        .onChange(of: selectedEpisode) { oldValue, newValue in
+            // When returning from video player (newValue becomes nil)
+            if oldValue != nil && newValue == nil {
+                Task {
+                    await loadEpisodes()
+                }
+            }
         }
     }
 
@@ -129,9 +137,10 @@ struct EpisodeRowView: View {
                         VStack {
                             Spacer()
                             GeometryReader { geometry in
-                                Rectangle()
-                                    .fill(Color.blue)
-                                    .frame(width: geometry.size.width * episode.progressPercentage)
+                                RoundedRectangle(cornerRadius: 5)
+                                    .fill(Color.red)
+                                    .frame(width: geometry.size.width * episode.progressPercentage,
+                                           height: 10)
                             }
                             .frame(height: 8)
                         }

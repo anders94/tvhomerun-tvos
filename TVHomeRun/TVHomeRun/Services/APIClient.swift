@@ -34,6 +34,9 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+// Empty response for requests that don't return data
+struct EmptyResponse: Codable {}
+
 @MainActor
 class APIClient: ObservableObject {
     @Published var isLoading = false
@@ -83,10 +86,28 @@ class APIClient: ObservableObject {
         )
     }
 
+    func updateEpisodeProgress(episodeId: Int, position: Int, watched: Bool) async throws {
+        struct ProgressUpdate: Codable {
+            let position: Int
+            let watched: Int
+        }
+
+        let body = ProgressUpdate(position: position, watched: watched ? 1 : 0)
+
+        try await performRequest(
+            endpoint: "/api/episodes/\(episodeId)/progress",
+            method: "PUT",
+            body: body,
+            responseType: EmptyResponse.self
+        )
+    }
+
     // MARK: - Generic Request Handler with Exponential Backoff
 
     private func performRequest<T: Decodable>(
         endpoint: String,
+        method: String = "GET",
+        body: Encodable? = nil,
         responseType: T.Type,
         retryCount: Int = 0
     ) async throws -> T {
@@ -95,8 +116,15 @@ class APIClient: ObservableObject {
         }
 
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Add body for PUT/POST requests
+        if let body = body {
+            let encoder = JSONEncoder()
+            request.httpBody = try encoder.encode(body)
+        }
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -122,6 +150,8 @@ class APIClient: ObservableObject {
             if retryCount < maxRetries {
                 return try await retryWithBackoff(
                     endpoint: endpoint,
+                    method: method,
+                    body: body,
                     responseType: responseType,
                     retryCount: retryCount,
                     error: error
@@ -135,6 +165,8 @@ class APIClient: ObservableObject {
             if retryCount < maxRetries {
                 return try await retryWithBackoff(
                     endpoint: endpoint,
+                    method: method,
+                    body: body,
                     responseType: responseType,
                     retryCount: retryCount,
                     error: apiError
@@ -146,6 +178,8 @@ class APIClient: ObservableObject {
 
     private func retryWithBackoff<T: Decodable>(
         endpoint: String,
+        method: String,
+        body: Encodable?,
         responseType: T.Type,
         retryCount: Int,
         error: APIError
@@ -167,6 +201,8 @@ class APIClient: ObservableObject {
 
         return try await performRequest(
             endpoint: endpoint,
+            method: method,
+            body: body,
             responseType: responseType,
             retryCount: retryCount + 1
         )

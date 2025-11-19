@@ -25,7 +25,7 @@ struct ShowInfo: Codable {
     }
 }
 
-struct Episode: Codable, Identifiable {
+struct Episode: Codable, Identifiable, Equatable {
     let id: Int
     let programId: String
     let title: String

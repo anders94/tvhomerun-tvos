@@ -12,13 +12,15 @@ struct VideoPlayerView: View {
     @Environment(\.dismiss) var dismiss
     let episode: Episode
     let allEpisodes: [Episode]
+    let apiClient: APIClient
 
     @StateObject private var playerViewModel: VideoPlayerViewModel
 
-    init(episode: Episode, allEpisodes: [Episode]) {
+    init(episode: Episode, allEpisodes: [Episode], apiClient: APIClient) {
         self.episode = episode
         self.allEpisodes = allEpisodes
-        _playerViewModel = StateObject(wrappedValue: VideoPlayerViewModel(episode: episode, allEpisodes: allEpisodes))
+        self.apiClient = apiClient
+        _playerViewModel = StateObject(wrappedValue: VideoPlayerViewModel(episode: episode, allEpisodes: allEpisodes, apiClient: apiClient))
     }
 
     var body: some View {
