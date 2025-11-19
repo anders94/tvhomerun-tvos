@@ -38,15 +38,18 @@ struct ShowsListView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 400, maximum: 500), spacing: 40)
+                        GridItem(.flexible(), spacing: 40),
+                        GridItem(.flexible(), spacing: 40),
+                        GridItem(.flexible(), spacing: 40)
                     ], spacing: 40) {
                         ForEach(shows) { show in
                             Button(action: {
                                 selectedShow = show
                             }) {
                                 ShowCardView(show: show)
+                                    .padding(8)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.card)
                         }
                     }
                     .padding(60)
@@ -129,12 +132,12 @@ struct ShowCardView: View {
                         Color.gray.opacity(0.3)
                         ProgressView()
                     }
-                    .frame(height: 300)
+                    .frame(height: 260)
                 case .success(let image):
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 300)
+                        .frame(height: 260)
                         .clipped()
                 case .failure:
                     ZStack {
@@ -143,29 +146,29 @@ struct ShowCardView: View {
                             .font(.system(size: 60))
                             .foregroundColor(.gray)
                     }
-                    .frame(height: 300)
+                    .frame(height: 260)
                 @unknown default:
                     Color.gray.opacity(0.3)
-                        .frame(height: 300)
+                        .frame(height: 260)
                 }
             }
             .cornerRadius(15)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(show.title)
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.system(size: 24, weight: .semibold))
                     .lineLimit(2)
 
                 HStack {
                     Text(show.category.capitalized)
-                        .font(.system(size: 20))
+                        .font(.system(size: 18))
                         .foregroundColor(.secondary)
 
                     if show.episodeCount > 0 {
                         Text("•")
                             .foregroundColor(.secondary)
                         Text("\(show.episodeCount) episode\(show.episodeCount == 1 ? "" : "s")")
-                            .font(.system(size: 20))
+                            .font(.system(size: 18))
                             .foregroundColor(.secondary)
                     }
                 }
@@ -175,6 +178,6 @@ struct ShowCardView: View {
         }
         .background(Color.gray.opacity(0.2))
         .cornerRadius(20)
-        .shadow(radius: 10)
+        .shadow(radius: 5)
     }
 }
