@@ -16,6 +16,8 @@ struct ShowsListView: View {
     @State private var showServerSettings = false
     @Namespace private var showsNamespace
     @State private var resetFocus = false
+    @State private var lastSelectedShowId: Int?
+    @FocusState private var focusedShowId: Int?
 
     var body: some View {
         ZStack {
@@ -36,26 +38,56 @@ struct ShowsListView: View {
                         .foregroundColor(.gray)
                 }
             } else {
-                ScrollView {
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 40),
-                        GridItem(.flexible(), spacing: 40),
-                        GridItem(.flexible(), spacing: 40)
-                    ], spacing: 40) {
-                        ForEach(shows) { show in
-                            Button(action: {
-                                selectedShow = show
-                            }) {
-                                ShowCardView(show: show)
-                                    .padding(8)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 40),
+                            GridItem(.flexible(), spacing: 40),
+                            GridItem(.flexible(), spacing: 40)
+                        ], spacing: 40) {
+                            ForEach(shows) { show in
+                                Button(action: {
+                                    lastSelectedShowId = show.id
+                                    selectedShow = show
+                                }) {
+                                    ShowCardView(show: show)
+                                        .padding(8)
+                                }
+                                .buttonStyle(.card)
+                                .id(show.id)
+                                .focused($focusedShowId, equals: show.id)
                             }
-                            .buttonStyle(.card)
+                        }
+                        .padding(60)
+                    }
+                    .id(resetFocus)
+                    .onAppear {
+                        // Restore focus when view appears
+                        DispatchQueue.main.async {
+                            if let lastId = lastSelectedShowId {
+                                // Restore to last selected show
+                                proxy.scrollTo(lastId, anchor: .center)
+                                focusedShowId = lastId
+                            } else if let firstShow = shows.first {
+                                // Focus first show if no saved position
+                                focusedShowId = firstShow.id
+                            }
                         }
                     }
-                    .padding(60)
+                    .onChange(of: selectedShow) { oldValue, newValue in
+                        // When returning from episodes (newValue becomes nil)
+                        if oldValue != nil && newValue == nil {
+                            DispatchQueue.main.async {
+                                if let lastId = lastSelectedShowId {
+                                    proxy.scrollTo(lastId, anchor: .center)
+                                    focusedShowId = lastId
+                                } else if let firstShow = shows.first {
+                                    focusedShowId = firstShow.id
+                                }
+                            }
+                        }
+                    }
                 }
-                .prefersDefaultFocus(in: showsNamespace)
-                .id(resetFocus)
             }
         }
         .focusScope(showsNamespace)
@@ -97,8 +129,12 @@ struct ShowsListView: View {
         }
         .onChange(of: isLoading) { oldValue, newValue in
             if !newValue && !shows.isEmpty {
-                // Force focus reset when shows finish loading
-                resetFocus.toggle()
+                // Set initial focus to first show when shows finish loading
+                DispatchQueue.main.async {
+                    if lastSelectedShowId == nil, let firstShow = shows.first {
+                        focusedShowId = firstShow.id
+                    }
+                }
             }
         }
     }

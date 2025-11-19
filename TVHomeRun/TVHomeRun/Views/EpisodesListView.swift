@@ -13,6 +13,8 @@ struct EpisodesListView: View {
     @State private var episodes: [Episode] = []
     @State private var isLoading = true
     @State private var selectedEpisode: Episode?
+    @State private var lastSelectedEpisodeId: Int?
+    @FocusState private var focusedEpisodeId: Int?
 
     var body: some View {
         ZStack {
@@ -33,18 +35,49 @@ struct EpisodesListView: View {
                         .foregroundColor(.gray)
                 }
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 20) {
-                        ForEach(episodes) { episode in
-                            Button(action: {
-                                selectedEpisode = episode
-                            }) {
-                                EpisodeRowView(episode: episode)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 20) {
+                            ForEach(episodes) { episode in
+                                Button(action: {
+                                    lastSelectedEpisodeId = episode.id
+                                    selectedEpisode = episode
+                                }) {
+                                    EpisodeRowView(episode: episode)
+                                }
+                                .buttonStyle(.plain)
+                                .id(episode.id)
+                                .focused($focusedEpisodeId, equals: episode.id)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .padding(60)
+                    }
+                    .onAppear {
+                        // Restore focus when view appears
+                        DispatchQueue.main.async {
+                            if let lastId = lastSelectedEpisodeId {
+                                // Restore to last selected episode
+                                proxy.scrollTo(lastId, anchor: .center)
+                                focusedEpisodeId = lastId
+                            } else if let firstEpisode = episodes.first {
+                                // Focus first episode if no saved position
+                                focusedEpisodeId = firstEpisode.id
+                            }
                         }
                     }
-                    .padding(60)
+                    .onChange(of: selectedEpisode) { oldValue, newValue in
+                        // When returning from video player (newValue becomes nil)
+                        if oldValue != nil && newValue == nil {
+                            DispatchQueue.main.async {
+                                if let lastId = lastSelectedEpisodeId {
+                                    proxy.scrollTo(lastId, anchor: .center)
+                                    focusedEpisodeId = lastId
+                                } else if let firstEpisode = episodes.first {
+                                    focusedEpisodeId = firstEpisode.id
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -69,11 +102,21 @@ struct EpisodesListView: View {
         .task {
             await loadEpisodes()
         }
+        .onChange(of: isLoading) { oldValue, newValue in
+            if !newValue && !episodes.isEmpty {
+                // Set initial focus to first episode when episodes finish loading
+                DispatchQueue.main.async {
+                    if lastSelectedEpisodeId == nil, let firstEpisode = episodes.first {
+                        focusedEpisodeId = firstEpisode.id
+                    }
+                }
+            }
+        }
         .onChange(of: selectedEpisode) { oldValue, newValue in
             // When returning from video player (newValue becomes nil)
             if oldValue != nil && newValue == nil {
                 Task {
-                    await loadEpisodes()
+                    await refreshWatchedEpisode()
                 }
             }
         }
@@ -92,6 +135,28 @@ struct EpisodesListView: View {
             await MainActor.run {
                 isLoading = false
             }
+        }
+    }
+
+    private func refreshWatchedEpisode() async {
+        do {
+            let response = try await apiClient.fetchEpisodes(for: show.id)
+            await MainActor.run {
+                // If episode count changed, we have new episodes - repaint entire list
+                if response.episodes.count != episodes.count {
+                    episodes = response.episodes
+                } else {
+                    // Update all episodes in place to avoid redraw flicker
+                    for updatedEpisode in response.episodes {
+                        if let index = episodes.firstIndex(where: { $0.id == updatedEpisode.id }) {
+                            episodes[index] = updatedEpisode
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Silently fail - not critical if refresh fails
+            print("Failed to refresh episodes: \(error)")
         }
     }
 }

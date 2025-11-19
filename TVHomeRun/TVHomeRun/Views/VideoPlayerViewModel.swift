@@ -123,8 +123,10 @@ class VideoPlayerViewModel: ObservableObject {
                     if let resumePos = episode.resumePosition, resumePos > 0 {
                         let seekTime = CMTime(seconds: Double(resumePos), preferredTimescale: 1)
                         self.player.seek(to: seekTime) { _ in
-                            self.player.play()
-                            self.isPlaying = true
+                            Task { @MainActor in
+                                self.player.play()
+                                self.isPlaying = true
+                            }
                         }
                         print("Resuming from position: \(resumePos) seconds")
                     } else {

@@ -94,7 +94,7 @@ class APIClient: ObservableObject {
 
         let body = ProgressUpdate(position: position, watched: watched ? 1 : 0)
 
-        try await performRequest(
+        _ = try await performRequest(
             endpoint: "/api/episodes/\(episodeId)/progress",
             method: "PUT",
             body: body,
