@@ -15,6 +15,7 @@ struct ShowsListView: View {
     @State private var selectedShow: Show?
     @State private var showServerSettings = false
     @Namespace private var showsNamespace
+    @State private var resetFocus = false
 
     var body: some View {
         ZStack {
@@ -51,6 +52,7 @@ struct ShowsListView: View {
                     .padding(60)
                 }
                 .prefersDefaultFocus(in: showsNamespace)
+                .id(resetFocus)
             }
         }
         .focusScope(showsNamespace)
@@ -65,12 +67,13 @@ struct ShowsListView: View {
                 }
             }
         }
-        
         .navigationDestination(item: $selectedShow) { show in
             EpisodesListView(apiClient: apiClient, show: show)
         }
         .sheet(isPresented: $showServerSettings) {
-            ServerSetupView(userSettings: userSettings)
+            ServerSetupView(userSettings: userSettings, onSettingsSaved: {
+                showServerSettings = false
+            })
         }
         .alert("Connection Error", isPresented: $apiClient.showErrorAlert) {
             Button("OK") {
@@ -88,6 +91,12 @@ struct ShowsListView: View {
         }
         .task {
             await loadShows()
+        }
+        .onChange(of: isLoading) { oldValue, newValue in
+            if !newValue && !shows.isEmpty {
+                // Force focus reset when shows finish loading
+                resetFocus.toggle()
+            }
         }
     }
 

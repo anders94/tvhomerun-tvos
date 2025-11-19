@@ -13,16 +13,16 @@ struct ServerSetupView: View {
     @State private var urlInput: String
     @State private var isValidating = false
     @State private var validationError: String?
-    @State private var navigateToShows = false
+    var onSettingsSaved: (() -> Void)? = nil
 
-    init(userSettings: UserSettings) {
+    init(userSettings: UserSettings, onSettingsSaved: (() -> Void)? = nil) {
         _urlInput = State(initialValue: userSettings.serverURL.isEmpty ? "http://" : userSettings.serverURL)
         _apiClient = StateObject(wrappedValue: APIClient(baseURL: userSettings.serverURL))
+        self.onSettingsSaved = onSettingsSaved
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
+        ZStack {
                 // Background gradient
                 LinearGradient(
                     gradient: Gradient(colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)]),
@@ -72,59 +72,33 @@ struct ServerSetupView: View {
                                 .padding(.horizontal, 40)
                         }
 
-                        HStack(spacing: 40) {
-                            // Accept button (primary action)
-                            Button(action: validateAndConnect) {
-                                HStack {
-                                    if isValidating {
-                                        ProgressView()
-                                            .progressViewStyle(.circular)
-                                            .tint(.white)
-                                    } else {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 28))
-                                    }
-                                    Text(isValidating ? "Connecting..." : "Accept")
-                                        .font(.system(size: 32, weight: .semibold))
+                        // Accept button
+                        Button(action: validateAndConnect) {
+                            HStack {
+                                if isValidating {
+                                    ProgressView()
+                                        .progressViewStyle(.circular)
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 28))
                                 }
-                                .frame(width: 300, height: 80)
-                                .background(Color.green)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
+                                Text(isValidating ? "Connecting..." : "Accept")
+                                    .font(.system(size: 32, weight: .semibold))
                             }
-                            .disabled(isValidating || urlInput.isEmpty)
-                            .buttonStyle(.card)
-
-                            // Edit/Change button (secondary action)
-                            if !userSettings.serverURL.isEmpty {
-                                Button(action: {
-                                    // Allow editing - just clear validation error
-                                    validationError = nil
-                                }) {
-                                    HStack {
-                                        Image(systemName: "pencil.circle.fill")
-                                            .font(.system(size: 28))
-                                        Text("Edit")
-                                            .font(.system(size: 32, weight: .semibold))
-                                    }
-                                    .frame(width: 300, height: 80)
-                                    .background(Color.gray.opacity(0.6))
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
-                                }
-                                .buttonStyle(.card)
-                            }
+                            .frame(width: 300, height: 80)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                         }
+                        .disabled(isValidating || urlInput.isEmpty)
+                        .buttonStyle(.card)
                     }
                     .padding(.horizontal, 60)
 
                     Spacer()
                 }
             }
-            .navigationDestination(isPresented: $navigateToShows) {
-                ShowsListView(apiClient: apiClient)
-            }
-        }
     }
 
     private func validateAndConnect() {
@@ -150,7 +124,7 @@ struct ServerSetupView: View {
                     await MainActor.run {
                         userSettings.saveServerURL(cleanURL)
                         isValidating = false
-                        navigateToShows = true
+                        onSettingsSaved?()
                     }
                 } else {
                     await MainActor.run {

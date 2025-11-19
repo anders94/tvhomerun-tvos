@@ -9,21 +9,64 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var userSettings: UserSettings
-    @State private var showSetup = false
+    @State private var showSettings = true
+    @State private var isCheckingConnectivity = true
 
     var body: some View {
         Group {
-            if userSettings.serverURL.isEmpty || showSetup {
-                ServerSetupView(userSettings: userSettings)
+            if isCheckingConnectivity {
+                // Checking connectivity
+                VStack(spacing: 30) {
+                    ProgressView()
+                        .scaleEffect(2)
+                    Text("Connecting...")
+                        .font(.system(size: 32))
+                }
+            } else if showSettings {
+                ServerSetupView(userSettings: userSettings, onSettingsSaved: {
+                    showSettings = false
+                })
             } else {
                 NavigationStack {
                     ShowsListView(apiClient: APIClient(baseURL: userSettings.serverURL))
                 }
             }
         }
-        .onAppear {
-            // Show setup if no URL is configured
-            showSetup = userSettings.serverURL.isEmpty
+        .task {
+            await checkInitialConnectivity()
+        }
+    }
+
+    private func checkInitialConnectivity() async {
+        // If no URL is set, show settings
+        guard !userSettings.serverURL.isEmpty else {
+            await MainActor.run {
+                showSettings = true
+                isCheckingConnectivity = false
+            }
+            return
+        }
+
+        // Try to connect to the server
+        let apiClient = APIClient(baseURL: userSettings.serverURL)
+        do {
+            let health = try await apiClient.checkHealth()
+            await MainActor.run {
+                if health.isHealthy {
+                    // Connection works, go to shows
+                    showSettings = false
+                } else {
+                    // Server not healthy, show settings
+                    showSettings = true
+                }
+                isCheckingConnectivity = false
+            }
+        } catch {
+            // Connection failed, show settings
+            await MainActor.run {
+                showSettings = true
+                isCheckingConnectivity = false
+            }
         }
     }
 }
