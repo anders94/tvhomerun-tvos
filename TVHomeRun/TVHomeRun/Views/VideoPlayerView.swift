@@ -163,19 +163,6 @@ struct VideoPlayerView: View {
                 }
             }
 
-            // Loading indicator
-            if playerViewModel.isLoading {
-                VStack {
-                    ProgressView()
-                        .scaleEffect(2)
-                        .tint(.white)
-                    Text("Loading...")
-                        .font(.system(size: 28))
-                        .foregroundColor(.white)
-                        .padding(.top, 20)
-                }
-            }
-
             // Error message
             if let error = playerViewModel.errorMessage {
                 VStack(spacing: 20) {
