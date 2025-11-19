@@ -11,7 +11,7 @@ import Combine
 
 @MainActor
 class VideoPlayerViewModel: ObservableObject {
-    @Published var player: AVPlayer
+    @Published var player: AVPlayer = AVPlayer()
     @Published var isPlaying = false
     @Published var isLoading = true
     @Published var showControls = true
@@ -25,7 +25,9 @@ class VideoPlayerViewModel: ObservableObject {
 
     private var timeObserver: Any?
     private var controlsTimer: Timer?
-    private var cancellables = Set<AnyCancellable>()
+    private var statusObserver: AnyCancellable?
+    private var endObserver: AnyCancellable?
+    private var hasSetup = false
 
     var hasNextEpisode: Bool {
         guard let currentIndex = allEpisodes.firstIndex(where: { $0.id == currentEpisode.id }) else {
@@ -44,18 +46,32 @@ class VideoPlayerViewModel: ObservableObject {
     init(episode: Episode, allEpisodes: [Episode]) {
         self.currentEpisode = episode
         self.allEpisodes = allEpisodes
-        self.player = AVPlayer()
 
-        setupPlayer(with: episode)
+        print("VideoPlayerViewModel init with episode: \(episode.episodeNumber)")
+    }
+
+    func setup() {
+        guard !hasSetup else {
+            print("Setup already called, skipping")
+            return
+        }
+        hasSetup = true
+        print("Setting up player for the first time")
+        setupPlayer(with: currentEpisode)
         setupControlsTimer()
     }
 
     private func setupPlayer(with episode: Episode) {
+        print("setupPlayer called for: \(episode.episodeNumber)")
         isLoading = true
         errorMessage = nil
 
+        // Clean up old observers (if any)
+        if timeObserver != nil || statusObserver != nil || endObserver != nil {
+            cleanup()
+        }
+
         print("Attempting to play URL: \(episode.playUrl)")
-        print("Command URL: \(episode.cmdUrl)")
 
         guard let url = URL(string: episode.playUrl) else {
             errorMessage = "Invalid video URL: \(episode.playUrl)"
@@ -65,7 +81,7 @@ class VideoPlayerViewModel: ObservableObject {
 
         print("Valid URL created: \(url)")
 
-        // Create player item directly - native player will handle format detection
+        // Create player item
         let playerItem = AVPlayerItem(url: url)
         player.replaceCurrentItem(with: playerItem)
 
@@ -76,46 +92,42 @@ class VideoPlayerViewModel: ObservableObject {
         }
 
         // Observe player item status
-        playerItem.publisher(for: \.status)
+        statusObserver = playerItem.publisher(for: \.status)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] status in
-                Task { @MainActor in
-                    switch status {
-                    case .readyToPlay:
-                        self?.isLoading = false
-                        // Seek to resume position if available
-                        if let resumePosition = episode.resumePosition, resumePosition > 0 {
-                            let seekTime = CMTime(seconds: Double(resumePosition), preferredTimescale: 1)
-                            self?.player.seek(to: seekTime)
-                        }
-                        self?.player.play()
-                        self?.isPlaying = true
-                    case .failed:
-                        if let error = playerItem.error {
-                            print("Player item failed with error: \(error)")
-                            self?.errorMessage = "Failed to load video: \(error.localizedDescription)"
-                        } else {
-                            print("Player item failed with unknown error")
-                            self?.errorMessage = "Failed to load video: Unknown error"
-                        }
-                        self?.isLoading = false
-                    default:
-                        break
+                guard let self = self else { return }
+                print("Player status changed to: \(status.rawValue)")
+
+                switch status {
+                case .readyToPlay:
+                    print("Player ready to play")
+                    self.isLoading = false
+                    self.player.play()
+                    self.isPlaying = true
+                case .failed:
+                    print("Player failed")
+                    if let error = playerItem.error {
+                        print("Error: \(error.localizedDescription)")
+                        self.errorMessage = "Failed to load video: \(error.localizedDescription)"
+                    } else {
+                        self.errorMessage = "Failed to load video"
                     }
+                    self.isLoading = false
+                default:
+                    print("Player status unknown")
+                    break
                 }
             }
-            .store(in: &cancellables)
 
         // Observe playback end
-        NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)
+        endObserver = NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                Task { @MainActor in
-                    // Auto-play next episode
-                    if self?.hasNextEpisode == true {
-                        self?.playNextEpisode()
-                    }
+                guard let self = self else { return }
+                if self.hasNextEpisode {
+                    self.playNextEpisode()
                 }
             }
-            .store(in: &cancellables)
     }
 
     private func updateProgress() {
@@ -175,13 +187,6 @@ class VideoPlayerViewModel: ObservableObject {
 
         let nextEpisode = allEpisodes[currentIndex + 1]
         currentEpisode = nextEpisode
-
-        // Remove old observers
-        if let timeObserver = timeObserver {
-            player.removeTimeObserver(timeObserver)
-        }
-        cancellables.removeAll()
-
         setupPlayer(with: nextEpisode)
         resetControlsTimer()
     }
@@ -194,13 +199,6 @@ class VideoPlayerViewModel: ObservableObject {
 
         let previousEpisode = allEpisodes[currentIndex - 1]
         currentEpisode = previousEpisode
-
-        // Remove old observers
-        if let timeObserver = timeObserver {
-            player.removeTimeObserver(timeObserver)
-        }
-        cancellables.removeAll()
-
         setupPlayer(with: previousEpisode)
         resetControlsTimer()
     }
@@ -220,20 +218,33 @@ class VideoPlayerViewModel: ObservableObject {
 
     private func resetControlsTimer() {
         controlsTimer?.invalidate()
-        controlsTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
-            Task { @MainActor in
-                if self?.isPlaying == true {
-                    self?.showControls = false
-                }
+        controlsTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            if self.isPlaying {
+                self.showControls = false
             }
         }
     }
 
-    func close() {
-        player.pause()
+    private func cleanup() {
+        print("Cleaning up observers")
         if let timeObserver = timeObserver {
             player.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
         }
+        statusObserver?.cancel()
+        statusObserver = nil
+        endObserver?.cancel()
+        endObserver = nil
+    }
+
+    func close() {
+        print("Closing player")
+        player.pause()
+        cleanup()
         controlsTimer?.invalidate()
     }
 }

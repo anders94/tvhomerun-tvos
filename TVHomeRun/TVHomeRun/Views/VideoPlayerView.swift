@@ -28,6 +28,9 @@ struct VideoPlayerView: View {
             // Use native AVPlayerViewController with built-in controls for better format support
             NativeVideoPlayer(player: playerViewModel.player)
                 .ignoresSafeArea()
+                .onAppear {
+                    playerViewModel.setup()
+                }
                 .onDisappear {
                     playerViewModel.close()
                 }
@@ -206,12 +209,13 @@ struct NativeVideoPlayer: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.player = player
-        controller.showsPlaybackControls = true // Use native controls for better format support
+        controller.showsPlaybackControls = true
         controller.videoGravity = .resizeAspect
         return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        // Only update if player instance changed
         if uiViewController.player !== player {
             uiViewController.player = player
         }
