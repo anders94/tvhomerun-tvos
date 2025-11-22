@@ -41,10 +41,11 @@ struct ShowsListView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 40),
-                            GridItem(.flexible(), spacing: 40),
-                            GridItem(.flexible(), spacing: 40)
-                        ], spacing: 40) {
+                            GridItem(.flexible(), spacing: 30),
+                            GridItem(.flexible(), spacing: 30),
+                            GridItem(.flexible(), spacing: 30),
+                            GridItem(.flexible(), spacing: 30)
+                        ], spacing: 30) {
                             ForEach(shows) { show in
                                 Button(action: {
                                     lastSelectedShowId = show.id
@@ -58,7 +59,7 @@ struct ShowsListView: View {
                                 .focused($focusedShowId, equals: show.id)
                             }
                         }
-                        .padding(60)
+                        .padding(50)
                     }
                     .id(resetFocus)
                     .onAppear {
@@ -159,7 +160,7 @@ struct ShowCardView: View {
     let show: Show
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: 10) {
             // Show image
             AsyncImage(url: URL(string: show.imageUrl ?? "")) { phase in
                 switch phase {
@@ -168,52 +169,52 @@ struct ShowCardView: View {
                         Color.gray.opacity(0.3)
                         ProgressView()
                     }
-                    .frame(height: 260)
+                    .frame(height: 200)
                 case .success(let image):
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(height: 260)
+                        .frame(height: 200)
                         .clipped()
                 case .failure:
                     ZStack {
                         Color.gray.opacity(0.3)
                         Image(systemName: "tv")
-                            .font(.system(size: 60))
+                            .font(.system(size: 50))
                             .foregroundColor(.gray)
                     }
-                    .frame(height: 260)
+                    .frame(height: 200)
                 @unknown default:
                     Color.gray.opacity(0.3)
-                        .frame(height: 260)
+                        .frame(height: 200)
                 }
             }
-            .cornerRadius(15)
+            .cornerRadius(12)
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(show.title)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .lineLimit(2)
 
                 HStack {
                     Text(show.category.capitalized)
-                        .font(.system(size: 18))
+                        .font(.system(size: 16))
                         .foregroundColor(.secondary)
 
                     if show.episodeCount > 0 {
                         Text("•")
                             .foregroundColor(.secondary)
                         Text("\(show.episodeCount) episode\(show.episodeCount == 1 ? "" : "s")")
-                            .font(.system(size: 18))
+                            .font(.system(size: 16))
                             .foregroundColor(.secondary)
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
         }
         .background(Color.gray.opacity(0.2))
-        .cornerRadius(20)
-        .shadow(radius: 5)
+        .cornerRadius(15)
+        .shadow(radius: 4)
     }
 }
