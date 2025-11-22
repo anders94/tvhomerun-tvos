@@ -4,18 +4,18 @@ A SwiftUI-based AppleTV application for streaming video content from a local net
 
 ## Features
 
-- 🎯 Server URL configuration with persistence
-- 📺 Browse shows with thumbnails and metadata
-- 🎬 Episode list with progress indicators and watch status
-- ▶️ Custom video player with:
+- Server URL configuration with persistence
+- Browse shows with thumbnails and metadata
+- Episode list with progress indicators and watch status
+- Custom video player with:
   - Resume playback from last position
   - Skip forward 30 seconds
   - Skip backward 15 seconds
   - Scrubbing controls
   - Episode navigation (next/previous)
-- 🔄 Exponential backoff for network errors
-- 💾 Automatic URL persistence
-- 🎨 Beautiful tvOS-optimized UI
+- Exponential backoff for network errors
+- Automatic URL persistence
+- Beautiful tvOS-optimized UI
 
 ## Project Setup
 
