@@ -107,12 +107,41 @@ struct Episode: Codable, Identifiable, Equatable {
 
     var formattedAirDate: String {
         let formatter = ISO8601DateFormatter()
-        if let date = formatter.date(from: originalAirdate) {
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            return displayFormatter.string(from: date)
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = formatter.date(from: originalAirdate) else {
+            return originalAirdate
         }
-        return originalAirdate
+
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Time formatter for "at 5:30pm" part
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a"
+        let timeString = timeFormatter.string(from: date).lowercased()
+
+        // Calculate days difference
+        let daysDifference = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 0
+
+        if daysDifference == 0 {
+            // Today
+            return "Today at \(timeString)"
+        } else if daysDifference == 1 {
+            // Yesterday
+            return "Yesterday at \(timeString)"
+        } else if daysDifference < 7 {
+            // Within the last week - show day of week
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "EEEE"
+            let dayName = dayFormatter.string(from: date)
+            return "\(dayName) at \(timeString)"
+        } else {
+            // A week or more ago - show full date with time
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "MMMM d, yyyy"
+            let dateString = dateFormatter.string(from: date)
+            return "\(dateString) at \(timeString)"
+        }
     }
 
     var formattedDuration: String {
