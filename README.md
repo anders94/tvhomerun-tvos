@@ -1,6 +1,6 @@
-# TV HomeRun - AppleTV Application
+# TV HomeRun - tvOS
 
-A SwiftUI-based AppleTV application for streaming video content from a local network server running [tvhomerun-backend](https://github.com/anders94/tvhomerun-backend).
+A SwiftUI-based AppleTV application for streaming video content from a server running [tvhomerun-backend](https://github.com/anders94/tvhomerun-backend).
 
 ## Features
 

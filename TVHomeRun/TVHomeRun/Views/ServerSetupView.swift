@@ -86,7 +86,7 @@ struct ServerSetupView: View {
                                 Text(isValidating ? "Connecting..." : "Accept")
                                     .font(.system(size: 32, weight: .semibold))
                             }
-                            .frame(width: 300, height: 80)
+                            .frame(width: 400, height: 90)
                             .background(Color.green)
                             .foregroundColor(.white)
                             .cornerRadius(12)
