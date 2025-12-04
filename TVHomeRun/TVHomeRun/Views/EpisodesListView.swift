@@ -264,6 +264,10 @@ struct EpisodeRowView: View {
                         .font(.system(size: 20))
                         .foregroundColor(.secondary)
 
+                    Label(episode.formattedCacheSize, systemImage: "opticaldiscdrive")
+                        .font(.system(size: 20))
+                        .foregroundColor(.secondary)
+
                     Label(episode.channelNumber, systemImage: "tv")
                         .font(.system(size: 20))
                         .foregroundColor(.secondary)

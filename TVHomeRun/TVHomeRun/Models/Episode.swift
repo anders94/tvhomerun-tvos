@@ -59,6 +59,7 @@ struct Episode: Codable, Identifiable, Equatable {
     let seriesTitle: String
     let durationMinutes: Int
     let resumeMinutes: Int
+    let hlsCacheBytes: Int
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -94,6 +95,7 @@ struct Episode: Codable, Identifiable, Equatable {
         case seriesTitle = "series_title"
         case durationMinutes = "duration_minutes"
         case resumeMinutes = "resume_minutes"
+        case hlsCacheBytes = "hls_cache_bytes"
     }
 
     var progressPercentage: Double {
@@ -152,5 +154,25 @@ struct Episode: Codable, Identifiable, Equatable {
             return "\(hours)h \(mins)m"
         }
         return "\(minutes)m"
+    }
+
+    var formattedCacheSize: String {
+        let bytes = Double(hlsCacheBytes)
+
+        if bytes == 0 {
+            return "0M"
+        }
+
+        let terabyte = 1_099_511_627_776.0 // 1024^4
+        let gigabyte = 1_073_741_824.0     // 1024^3
+        let megabyte = 1_048_576.0         // 1024^2
+
+        if bytes >= terabyte {
+            return String(format: "%.1fT", bytes / terabyte)
+        } else if bytes >= gigabyte {
+            return String(format: "%.1fG", bytes / gigabyte)
+        } else {
+            return String(format: "%.1fM", bytes / megabyte)
+        }
     }
 }
