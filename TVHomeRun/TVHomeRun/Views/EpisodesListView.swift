@@ -15,6 +15,8 @@ struct EpisodesListView: View {
     @State private var selectedEpisode: Episode?
     @State private var lastSelectedEpisodeId: Int?
     @FocusState private var focusedEpisodeId: Int?
+    @State private var episodeToDelete: Episode?
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ZStack {
@@ -46,6 +48,14 @@ struct EpisodesListView: View {
                                     EpisodeRowView(episode: episode)
                                 }
                                 .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        episodeToDelete = episode
+                                        showDeleteConfirmation = true
+                                    } label: {
+                                        Label("Delete Episode", systemImage: "trash")
+                                    }
+                                }
                                 .id(episode.id)
                                 .focused($focusedEpisodeId, equals: episode.id)
                             }
@@ -97,6 +107,22 @@ struct EpisodesListView: View {
         } message: {
             if let error = apiClient.error {
                 Text(error.localizedDescription)
+            }
+        }
+        .alert("Delete Episode", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                episodeToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let episode = episodeToDelete {
+                    Task {
+                        await deleteEpisode(episode)
+                    }
+                }
+            }
+        } message: {
+            if let episode = episodeToDelete {
+                Text("Are you sure you want to delete \"\(episode.episodeTitle)\"? This cannot be undone.")
             }
         }
         .task {
@@ -157,6 +183,34 @@ struct EpisodesListView: View {
         } catch {
             // Silently fail - not critical if refresh fails
             print("Failed to refresh episodes: \(error)")
+        }
+    }
+
+    private func deleteEpisode(_ episode: Episode) async {
+        do {
+            let response = try await apiClient.deleteEpisode(episodeId: episode.id, allowRerecord: false)
+            print("Delete response: success=\(response.success), message=\(response.message)")
+
+            await MainActor.run {
+                // Remove the deleted episode from the list
+                episodes.removeAll { $0.id == episode.id }
+                episodeToDelete = nil
+                showDeleteConfirmation = false
+
+                print("Episode removed. Remaining episodes: \(episodes.count)")
+
+                // Update focus to next or previous episode
+                if let firstEpisode = episodes.first {
+                    focusedEpisodeId = firstEpisode.id
+                }
+            }
+        } catch {
+            print("Delete error: \(error)")
+            await MainActor.run {
+                episodeToDelete = nil
+                showDeleteConfirmation = false
+            }
+            // Error will be shown via the existing error alert
         }
     }
 }

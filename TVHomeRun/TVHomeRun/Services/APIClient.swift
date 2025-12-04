@@ -37,6 +37,37 @@ enum APIError: Error, LocalizedError {
 // Empty response for requests that don't return data
 struct EmptyResponse: Codable {}
 
+struct DeleteEpisodeResponse: Codable {
+    let success: Bool
+    let message: String
+    let episode: DeletedEpisodeInfo?
+    let deviceDeletion: DeletionStatus?
+    let hlsDeletion: DeletionStatus?
+
+    struct DeletedEpisodeInfo: Codable {
+        let id: Int
+        let seriesTitle: String?
+        let episodeTitle: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id
+            case seriesTitle = "series_title"
+            case episodeTitle = "episode_title"
+        }
+    }
+
+    struct DeletionStatus: Codable {
+        let success: Bool
+        let message: String?
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case success, message, episode
+        case deviceDeletion = "device_deletion"
+        case hlsDeletion = "hls_deletion"
+    }
+}
+
 @MainActor
 class APIClient: ObservableObject {
     @Published var isLoading = false
@@ -102,6 +133,15 @@ class APIClient: ObservableObject {
         )
     }
 
+    func deleteEpisode(episodeId: Int, allowRerecord: Bool = false) async throws -> DeleteEpisodeResponse {
+        let rerecordParam = allowRerecord ? "true" : "false"
+        return try await performRequest(
+            endpoint: "/api/episodes/\(episodeId)?rerecord=\(rerecordParam)",
+            method: "DELETE",
+            responseType: DeleteEpisodeResponse.self
+        )
+    }
+
     // MARK: - Generic Request Handler with Exponential Backoff
 
     private func performRequest<T: Decodable>(
@@ -146,8 +186,15 @@ class APIClient: ObservableObject {
             }
 
         } catch let error as APIError {
+            // Don't retry DELETE requests or decoding errors (not idempotent)
+            let isDecodingError = {
+                if case .decodingError = error { return true }
+                return false
+            }()
+            let shouldRetry = method != "DELETE" && !isDecodingError
+
             // Already an APIError, check if we should retry
-            if retryCount < maxRetries {
+            if shouldRetry && retryCount < maxRetries {
                 return try await retryWithBackoff(
                     endpoint: endpoint,
                     method: method,
