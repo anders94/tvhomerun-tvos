@@ -17,6 +17,7 @@ struct EpisodesListView: View {
     @FocusState private var focusedEpisodeId: Int?
     @State private var episodeToDelete: Episode?
     @State private var showDeleteConfirmation = false
+    @State private var episodeForActions: Episode?
 
     var body: some View {
         ZStack {
@@ -48,13 +49,8 @@ struct EpisodesListView: View {
                                     EpisodeRowView(episode: episode)
                                 }
                                 .buttonStyle(.plain)
-                                .contextMenu {
-                                    Button(role: .destructive) {
-                                        episodeToDelete = episode
-                                        showDeleteConfirmation = true
-                                    } label: {
-                                        Label("Delete Episode", systemImage: "trash")
-                                    }
+                                .onPlayPauseCommand {
+                                    episodeForActions = episode
                                 }
                                 .id(episode.id)
                                 .focused($focusedEpisodeId, equals: episode.id)
@@ -123,6 +119,21 @@ struct EpisodesListView: View {
         } message: {
             if let episode = episodeToDelete {
                 Text("Are you sure you want to delete \"\(episode.episodeTitle)\"? This cannot be undone.")
+            }
+        }
+        .confirmationDialog("Episode Options", isPresented: .init(
+            get: { episodeForActions != nil },
+            set: { if !$0 { episodeForActions = nil } }
+        ), titleVisibility: .visible) {
+            Button("Delete Episode", role: .destructive) {
+                if let episode = episodeForActions {
+                    episodeToDelete = episode
+                    showDeleteConfirmation = true
+                    episodeForActions = nil
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                episodeForActions = nil
             }
         }
         .task {
