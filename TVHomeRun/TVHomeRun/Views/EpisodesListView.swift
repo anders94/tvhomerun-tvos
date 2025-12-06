@@ -18,6 +18,10 @@ struct EpisodesListView: View {
     @State private var episodeToDelete: Episode?
     @State private var showDeleteConfirmation = false
     @State private var episodeForActions: Episode?
+    @State private var isRecordingEnabled = false
+    @State private var currentRecordingRule: RecordingRule?
+    @State private var isLoadingRules = true
+    @State private var isUpdating = false
 
     var body: some View {
         ZStack {
@@ -40,23 +44,49 @@ struct EpisodesListView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 20) {
-                            ForEach(episodes) { episode in
-                                Button(action: {
-                                    lastSelectedEpisodeId = episode.id
-                                    selectedEpisode = episode
-                                }) {
-                                    EpisodeRowView(episode: episode)
+                        VStack(spacing: 30) {
+                            // Recording toggle section
+                            VStack(alignment: .leading, spacing: 20) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Record This Series")
+                                            .font(.system(size: 28, weight: .semibold))
+                                        Text("Automatically record new episodes")
+                                            .font(.system(size: 20))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Toggle("", isOn: $isRecordingEnabled)
+                                        .labelsHidden()
+                                        .disabled(isUpdating)
                                 }
-                                .buttonStyle(.plain)
-                                .onPlayPauseCommand {
-                                    episodeForActions = episode
-                                }
-                                .id(episode.id)
-                                .focused($focusedEpisodeId, equals: episode.id)
+                                .padding(30)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(15)
                             }
+                            .padding(.horizontal, 60)
+                            .padding(.top, 20)
+
+                            // Episodes list
+                            LazyVStack(spacing: 20) {
+                                ForEach(episodes) { episode in
+                                    Button(action: {
+                                        lastSelectedEpisodeId = episode.id
+                                        selectedEpisode = episode
+                                    }) {
+                                        EpisodeRowView(episode: episode)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .onPlayPauseCommand {
+                                        episodeForActions = episode
+                                    }
+                                    .id(episode.id)
+                                    .focused($focusedEpisodeId, equals: episode.id)
+                                }
+                            }
+                            .padding(.horizontal, 60)
+                            .padding(.bottom, 60)
                         }
-                        .padding(60)
                     }
                     .onAppear {
                         // Restore focus when view appears
@@ -138,6 +168,8 @@ struct EpisodesListView: View {
         }
         .task {
             await loadEpisodes()
+            await loadRecordingStatus()
+            isLoadingRules = false
         }
         .onChange(of: isLoading) { oldValue, newValue in
             if !newValue && !episodes.isEmpty {
@@ -154,6 +186,14 @@ struct EpisodesListView: View {
             if oldValue != nil && newValue == nil {
                 Task {
                     await refreshWatchedEpisode()
+                }
+            }
+        }
+        .onChange(of: isRecordingEnabled) { oldValue, newValue in
+            // Only act on user changes, not initial load
+            if !isLoadingRules && oldValue != newValue {
+                Task {
+                    await toggleRecording(enabled: newValue)
                 }
             }
         }
@@ -222,6 +262,52 @@ struct EpisodesListView: View {
                 showDeleteConfirmation = false
             }
             // Error will be shown via the existing error alert
+        }
+    }
+
+    private func loadRecordingStatus() async {
+        do {
+            let response = try await apiClient.fetchRecordingRules()
+            await MainActor.run {
+                // Store the recording rule (we need the ID for deletion)
+                currentRecordingRule = response.rules.first { $0.seriesId == show.seriesId }
+                isRecordingEnabled = currentRecordingRule != nil
+            }
+        } catch {
+            // Silently fail - user can still toggle to create rule
+        }
+    }
+
+    private func toggleRecording(enabled: Bool) async {
+        isUpdating = true
+        do {
+            if enabled {
+                // Create new recording rule
+                let response = try await apiClient.createRecordingRule(seriesId: show.seriesId)
+                await MainActor.run {
+                    if let rule = response.recordingRule {
+                        currentRecordingRule = rule
+                    }
+                    isUpdating = false
+                }
+            } else {
+                // Delete existing recording rule
+                if let ruleId = currentRecordingRule?.id {
+                    try await apiClient.deleteRecordingRule(ruleId: ruleId)
+                    await MainActor.run {
+                        currentRecordingRule = nil
+                        isUpdating = false
+                    }
+                }
+            }
+        } catch {
+            await MainActor.run {
+                // Revert toggle on error
+                isRecordingEnabled = !enabled
+                currentRecordingRule = enabled ? nil : currentRecordingRule
+                isUpdating = false
+            }
+            // Error is already handled by APIClient's error alert
         }
     }
 }
