@@ -49,9 +49,16 @@ struct GuideDetailView: View {
                         .font(.system(size: 28, weight: .bold))
                         .padding(.horizontal, 30)
 
-                    VStack(spacing: 20) {
-                        ForEach(series.programs.sorted(by: { $0.startTime < $1.startTime })) { program in
-                            GuideProgramCard(program: program)
+                    if series.programs.isEmpty {
+                        Text("No upcoming episodes found")
+                            .font(.system(size: 20))
+                            .foregroundColor(.secondary)
+                            .padding(30)
+                    } else {
+                        VStack(spacing: 20) {
+                            ForEach(series.programs.sorted(by: { $0.startTime < $1.startTime })) { program in
+                                GuideProgramCard(program: program)
+                            }
                         }
                     }
                 }
@@ -176,8 +183,14 @@ struct GuideProgramCard: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
+                // Show episode title if available, otherwise show series title
                 if let episodeTitle = program.episodeTitle, !episodeTitle.isEmpty {
                     Text(episodeTitle)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                } else {
+                    Text(program.title)
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(.primary)
                         .lineLimit(2)

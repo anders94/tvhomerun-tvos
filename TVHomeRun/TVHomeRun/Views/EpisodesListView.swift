@@ -302,20 +302,25 @@ struct EpisodeRowView: View {
 
             // Episode info
             VStack(alignment: .leading, spacing: 12) {
-                // Episode number and title
-                Text(episode.episodeNumber)
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.blue)
+                // Episode number (only show if not empty)
+                if !episode.episodeNumber.isEmpty {
+                    Text(episode.episodeNumber)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.blue)
+                }
 
-                Text(episode.episodeTitle)
+                // Episode title (fallback to series title if empty)
+                Text(episode.episodeTitle.isEmpty ? episode.title : episode.episodeTitle)
                     .font(.system(size: 32, weight: .bold))
                     .lineLimit(2)
 
-                // Synopsis
-                Text(episode.synopsis)
-                    .font(.system(size: 24))
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
+                // Synopsis (only show if not empty)
+                if !episode.synopsis.isEmpty {
+                    Text(episode.synopsis)
+                        .font(.system(size: 24))
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                }
 
                 Spacer()
 
