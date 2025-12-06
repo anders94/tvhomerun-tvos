@@ -14,6 +14,7 @@ struct ShowsListView: View {
     @State private var isLoading = true
     @State private var selectedShow: Show?
     @State private var showServerSettings = false
+    @State private var showGuide = false
     @Namespace private var showsNamespace
     @State private var resetFocus = false
     @State private var lastSelectedShowId: Int?
@@ -21,6 +22,7 @@ struct ShowsListView: View {
 
     var body: some View {
         ZStack {
+            // Content area (behind header)
             if isLoading {
                 VStack(spacing: 30) {
                     ProgressView()
@@ -40,13 +42,18 @@ struct ShowsListView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVGrid(columns: [
-                            GridItem(.flexible(), spacing: 30),
-                            GridItem(.flexible(), spacing: 30),
-                            GridItem(.flexible(), spacing: 30),
-                            GridItem(.flexible(), spacing: 30)
-                        ], spacing: 30) {
-                            ForEach(shows) { show in
+                        VStack(spacing: 0) {
+                            // Spacer to push content below header
+                            Color.clear
+                                .frame(height: 140)
+
+                            LazyVGrid(columns: [
+                                GridItem(.flexible(), spacing: 30),
+                                GridItem(.flexible(), spacing: 30),
+                                GridItem(.flexible(), spacing: 30),
+                                GridItem(.flexible(), spacing: 30)
+                            ], spacing: 30) {
+                                ForEach(shows) { show in
                                 Button(action: {
                                     lastSelectedShowId = show.id
                                     selectedShow = show
@@ -60,6 +67,7 @@ struct ShowsListView: View {
                             }
                         }
                         .padding(50)
+                        }
                     }
                     .id(resetFocus)
                     .onAppear {
@@ -90,19 +98,41 @@ struct ShowsListView: View {
                     }
                 }
             }
-        }
-        .focusScope(showsNamespace)
-        .navigationTitle("TV HomeRun")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showServerSettings = true
-                }) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 28))
+
+            // Header overlay with buttons
+            VStack {
+                HStack {
+                    Button(action: {
+                        showGuide = true
+                    }) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 40))
+                            .frame(width: 80, height: 80)
+                    }
+
+                    Spacer()
+
+                    Text("TVHomeRun")
+                        .font(.system(size: 56, weight: .bold))
+
+                    Spacer()
+
+                    Button(action: {
+                        showServerSettings = true
+                    }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 40))
+                            .frame(width: 80, height: 80)
+                    }
                 }
+                .padding(.horizontal, 50)
+                .padding(.vertical, 30)
+                .background(.ultraThinMaterial)
+
+                Spacer()
             }
         }
+        .focusScope(showsNamespace)
         .navigationDestination(item: $selectedShow) { show in
             EpisodesListView(apiClient: apiClient, show: show)
         }
@@ -110,6 +140,9 @@ struct ShowsListView: View {
             ServerSetupView(userSettings: userSettings, onSettingsSaved: {
                 showServerSettings = false
             })
+        }
+        .fullScreenCover(isPresented: $showGuide) {
+            GuideView(apiClient: apiClient)
         }
         .alert("Connection Error", isPresented: $apiClient.showErrorAlert) {
             Button("OK") {

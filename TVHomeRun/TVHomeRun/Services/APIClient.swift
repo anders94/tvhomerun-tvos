@@ -83,7 +83,7 @@ class APIClient: ObservableObject {
     init(baseURL: String) {
         self.baseURL = baseURL
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForRequest = 60  // Increased for guide endpoint
         config.timeoutIntervalForResource = 300
         self.session = URLSession(configuration: config)
     }
@@ -139,6 +139,50 @@ class APIClient: ObservableObject {
             endpoint: "/api/episodes/\(episodeId)?rerecord=\(rerecordParam)",
             method: "DELETE",
             responseType: DeleteEpisodeResponse.self
+        )
+    }
+
+    // MARK: - Guide
+
+    func fetchGuide(forceRefresh: Bool = false) async throws -> GuideResponse {
+        let refreshParam = forceRefresh ? "?forceRefresh=true" : ""
+        return try await performRequest(
+            endpoint: "/api/guide\(refreshParam)",
+            responseType: GuideResponse.self
+        )
+    }
+
+    // MARK: - Recording Rules
+
+    func fetchRecordingRules() async throws -> RecordingRulesResponse {
+        return try await performRequest(
+            endpoint: "/api/recording-rules",
+            responseType: RecordingRulesResponse.self
+        )
+    }
+
+    func createRecordingRule(seriesId: String) async throws -> RecordingRuleResponse {
+        let request = CreateRecordingRuleRequest(
+            seriesId: seriesId,
+            channelOnly: nil,
+            teamOnly: nil,
+            recentOnly: nil,
+            startPadding: nil,
+            endPadding: nil
+        )
+        return try await performRequest(
+            endpoint: "/api/recording-rules",
+            method: "POST",
+            body: request,
+            responseType: RecordingRuleResponse.self
+        )
+    }
+
+    func deleteRecordingRule(ruleId: String) async throws {
+        _ = try await performRequest(
+            endpoint: "/api/recording-rules/\(ruleId)",
+            method: "DELETE",
+            responseType: EmptyResponse.self
         )
     }
 
