@@ -15,6 +15,7 @@ struct ShowsListView: View {
     @State private var selectedShow: Show?
     @State private var showServerSettings = false
     @State private var showGuide = false
+    @State private var showLive = false
     @Namespace private var showsNamespace
     @State private var resetFocus = false
     @State private var lastSelectedShowId: Int?
@@ -110,6 +111,14 @@ struct ShowsListView: View {
                             .frame(width: 80, height: 80)
                     }
 
+                    Button(action: {
+                        showLive = true
+                    }) {
+                        Image(systemName: "tv")
+                            .font(.system(size: 40))
+                            .frame(width: 80, height: 80)
+                    }
+
                     Spacer()
 
                     Text("TVHomeRun")
@@ -143,6 +152,9 @@ struct ShowsListView: View {
         }
         .fullScreenCover(isPresented: $showGuide) {
             GuideView(apiClient: apiClient)
+        }
+        .fullScreenCover(isPresented: $showLive) {
+            LiveChannelsView(apiClient: apiClient)
         }
         .alert("Connection Error", isPresented: $apiClient.showErrorAlert) {
             Button("OK") {

@@ -24,6 +24,10 @@
 		9AEA28782ECCD3170078C6AC /* GuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA28742ECCD3170078C6AC /* GuideView.swift */; };
 		9AEA28792ECCD3170078C6AC /* GuideDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA28752ECCD3170078C6AC /* GuideDetailView.swift */; };
 		A058F071A3244EFB8C0F64AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7308C8C9F025462499C7E06E /* Assets.xcassets */; };
+		30967371C9A1955B8B4A2444 /* Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA6FFF3B80CD97397CA6815F /* Channel.swift */; };
+		53D8D58C7F2102A3D5383675 /* LiveChannelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A66AF7ED153FEEB7BED25B23 /* LiveChannelsView.swift */; };
+		0ECF5EE4097375470FEEFC97 /* LiveVideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 950C05C08DA0DE5D38621C6C /* LiveVideoPlayerView.swift */; };
+		50A9AB91BD95279F5BF54E25 /* LiveVideoPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1E33AAA40E0B10A57AA30E /* LiveVideoPlayerViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +50,10 @@
 		9AEA28732ECCD3170078C6AC /* RecordingRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingRule.swift; sourceTree = "<group>"; };
 		9AEA28742ECCD3170078C6AC /* GuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideView.swift; sourceTree = "<group>"; };
 		9AEA28752ECCD3170078C6AC /* GuideDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuideDetailView.swift; sourceTree = "<group>"; };
+		BA6FFF3B80CD97397CA6815F /* Channel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Channel.swift; sourceTree = "<group>"; };
+		A66AF7ED153FEEB7BED25B23 /* LiveChannelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveChannelsView.swift; sourceTree = "<group>"; };
+		950C05C08DA0DE5D38621C6C /* LiveVideoPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoPlayerView.swift; sourceTree = "<group>"; };
+		FF1E33AAA40E0B10A57AA30E /* LiveVideoPlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoPlayerViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +86,7 @@
 		9AEA28582ECCD3170078C6AB /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				BA6FFF3B80CD97397CA6815F /* Channel.swift */,
 				9AEA28552ECCD3170078C6AB /* Episode.swift */,
 				9AEA28722ECCD3170078C6AC /* Guide.swift */,
 				9AEA28562ECCD3170078C6AB /* Health.swift */,
@@ -109,6 +118,9 @@
 				9AEA285D2ECCD3170078C6AB /* EpisodesListView.swift */,
 				9AEA28752ECCD3170078C6AC /* GuideDetailView.swift */,
 				9AEA28742ECCD3170078C6AC /* GuideView.swift */,
+				A66AF7ED153FEEB7BED25B23 /* LiveChannelsView.swift */,
+				950C05C08DA0DE5D38621C6C /* LiveVideoPlayerView.swift */,
+				FF1E33AAA40E0B10A57AA30E /* LiveVideoPlayerViewModel.swift */,
 				9AEA285E2ECCD3170078C6AB /* ServerSetupView.swift */,
 				9AEA285F2ECCD3170078C6AB /* ShowsListView.swift */,
 				9AEA28602ECCD3170078C6AB /* VideoPlayerView.swift */,
@@ -220,6 +232,10 @@
 				9AEA28772ECCD3170078C6AC /* RecordingRule.swift in Sources */,
 				9AEA28782ECCD3170078C6AC /* GuideView.swift in Sources */,
 				9AEA28792ECCD3170078C6AC /* GuideDetailView.swift in Sources */,
+				30967371C9A1955B8B4A2444 /* Channel.swift in Sources */,
+				53D8D58C7F2102A3D5383675 /* LiveChannelsView.swift in Sources */,
+				0ECF5EE4097375470FEEFC97 /* LiveVideoPlayerView.swift in Sources */,
+				50A9AB91BD95279F5BF54E25 /* LiveVideoPlayerViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

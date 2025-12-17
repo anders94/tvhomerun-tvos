@@ -74,7 +74,7 @@ class APIClient: ObservableObject {
     @Published var error: APIError?
     @Published var showErrorAlert = false
 
-    private var baseURL: String
+    internal var baseURL: String
     private let session: URLSession
     private let maxRetries = 3
     private let initialBackoff: TimeInterval = 1.0
@@ -183,6 +183,65 @@ class APIClient: ObservableObject {
             endpoint: "/api/recording-rules/\(ruleId)",
             method: "DELETE",
             responseType: EmptyResponse.self
+        )
+    }
+
+    // MARK: - Live TV
+
+    func fetchLiveChannels() async throws -> ChannelsResponse {
+        return try await performRequest(
+            endpoint: "/api/live/channels",
+            responseType: ChannelsResponse.self
+        )
+    }
+
+    func fetchCurrentPrograms() async throws -> CurrentProgramsResponse {
+        return try await performRequest(
+            endpoint: "/api/guide/now",
+            responseType: CurrentProgramsResponse.self
+        )
+    }
+
+    func startWatching(channelNumber: String, clientId: String) async throws -> WatchResponse {
+        struct WatchRequest: Codable {
+            let channelNumber: String
+            let clientId: String
+        }
+
+        let request = WatchRequest(channelNumber: channelNumber, clientId: clientId)
+        return try await performRequest(
+            endpoint: "/api/live/watch",
+            method: "POST",
+            body: request,
+            responseType: WatchResponse.self
+        )
+    }
+
+    func sendHeartbeat(clientId: String) async throws -> LiveTVResponse {
+        struct HeartbeatRequest: Codable {
+            let clientId: String
+        }
+
+        let request = HeartbeatRequest(clientId: clientId)
+        return try await performRequest(
+            endpoint: "/api/live/heartbeat",
+            method: "POST",
+            body: request,
+            responseType: LiveTVResponse.self
+        )
+    }
+
+    func stopWatching(clientId: String) async throws -> LiveTVResponse {
+        struct StopRequest: Codable {
+            let clientId: String
+        }
+
+        let request = StopRequest(clientId: clientId)
+        return try await performRequest(
+            endpoint: "/api/live/stop",
+            method: "POST",
+            body: request,
+            responseType: LiveTVResponse.self
         )
     }
 
