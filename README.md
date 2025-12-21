@@ -1,6 +1,6 @@
 # TV HomeRun - tvOS
 
-A SwiftUI-based TV management and streaming client for AppleTV that connects to a server running [tvhomerun-backend](https://github.com/anders94/tvhomerun-backend). Watch live TV, manage your DVR schedule, and browse recorded content—all from your iPhone or iPad.
+A SwiftUI-based TV management and streaming client for AppleTV that connects to a server running [tvhomerun-backend](https://github.com/anders94/tvhomerun-backend). Watch live TV, manage your DVR schedule, and browse recorded content—all from your AppleTV.
 
 ## Features
 
