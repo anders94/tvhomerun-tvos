@@ -97,3 +97,37 @@ struct LiveTVResponse: Codable {
     let success: Bool
     let message: String
 }
+
+// MARK: - Guide number ordering
+
+extension Channel {
+    /// Orders HDHomeRun guide numbers numerically by major then minor part,
+    /// so "2.1" < "11.1" < "115" < "115.2". Non-numeric values sort after
+    /// numeric ones using a natural string comparison.
+    nonisolated static func compareGuideNumbers(_ a: String, _ b: String) -> Bool {
+        func parse(_ value: String) -> (major: Int, minor: Int)? {
+            let parts = value.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+            guard let first = parts.first, let major = Int(first) else { return nil }
+            if parts.count > 1 {
+                guard let minor = Int(parts[1]) else { return nil }
+                return (major, minor)
+            }
+            return (major, 0)
+        }
+
+        switch (parse(a), parse(b)) {
+        case let (lhs?, rhs?):
+            return lhs.major != rhs.major ? lhs.major < rhs.major : lhs.minor < rhs.minor
+        case (.some, .none):
+            return true
+        case (.none, .some):
+            return false
+        case (.none, .none):
+            return a.localizedStandardCompare(b) == .orderedAscending
+        }
+    }
+
+    nonisolated static func guideNumberAscending(_ lhs: Channel, _ rhs: Channel) -> Bool {
+        compareGuideNumbers(lhs.guideNumber, rhs.guideNumber)
+    }
+}

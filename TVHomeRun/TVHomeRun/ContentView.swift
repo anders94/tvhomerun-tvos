@@ -2,71 +2,46 @@
 //  ContentView.swift
 //  TVHomeRun
 //
-//  Root content view that handles navigation based on setup state
+//  Root view: probes the configured server, then shows setup or the main tabs
 //
 
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var userSettings: UserSettings
-    @State private var showSettings = true
-    @State private var isCheckingConnectivity = true
+    @EnvironmentObject private var userSettings: UserSettings
+    @State private var launchState: LaunchState = .checking
+
+    private enum LaunchState {
+        case checking
+        case needsSetup
+        case ready
+    }
 
     var body: some View {
         Group {
-            if isCheckingConnectivity {
-                // Checking connectivity
-                VStack(spacing: 30) {
-                    ProgressView()
-                        .scaleEffect(2)
-                    Text("Connecting...")
-                        .font(.system(size: 32))
-                }
-            } else if showSettings {
-                ServerSetupView(userSettings: userSettings, onSettingsSaved: {
-                    showSettings = false
-                })
-            } else {
-                NavigationStack {
-                    ShowsListView(apiClient: APIClient(baseURL: userSettings.serverURL))
-                }
+            switch launchState {
+            case .checking:
+                ProgressView("Connecting…")
+            case .needsSetup:
+                ServerSetupView { launchState = .ready }
+            case .ready:
+                MainTabView(serverURL: userSettings.serverURL)
             }
         }
-        .task {
-            await checkInitialConnectivity()
-        }
+        .task { await checkInitialConnectivity() }
     }
 
     private func checkInitialConnectivity() async {
-        // If no URL is set, show settings
         guard !userSettings.serverURL.isEmpty else {
-            await MainActor.run {
-                showSettings = true
-                isCheckingConnectivity = false
-            }
+            launchState = .needsSetup
             return
         }
 
-        // Try to connect to the server
-        let apiClient = APIClient(baseURL: userSettings.serverURL)
-        do {
-            let health = try await apiClient.checkHealth()
-            await MainActor.run {
-                if health.isHealthy {
-                    // Connection works, go to shows
-                    showSettings = false
-                } else {
-                    // Server not healthy, show settings
-                    showSettings = true
-                }
-                isCheckingConnectivity = false
-            }
-        } catch {
-            // Connection failed, show settings
-            await MainActor.run {
-                showSettings = true
-                isCheckingConnectivity = false
-            }
+        let probe = APIClient(baseURL: userSettings.serverURL)
+        if let health = try? await probe.checkHealth(), health.isHealthy {
+            launchState = .ready
+        } else {
+            launchState = .needsSetup
         }
     }
 }

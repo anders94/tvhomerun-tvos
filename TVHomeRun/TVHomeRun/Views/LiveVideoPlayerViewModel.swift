@@ -89,7 +89,7 @@ class LiveVideoPlayerViewModel: ObservableObject {
                 await MainActor.run {
                     self.isLoading = false
                 }
-                await setupPlayerWithItem(url: playlistURL)
+                setupPlayerWithItem(url: playlistURL)
             } catch {
                 await MainActor.run {
                     self.errorMessage = "Failed to start stream: \(error.localizedDescription)"

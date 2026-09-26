@@ -2,7 +2,7 @@
 //  GuideView.swift
 //  TVHomeRun
 //
-//  View for browsing and searching upcoming TV programs
+//  Guide tab: browse and search upcoming programs, grouped by series
 //
 
 import SwiftUI
@@ -10,152 +10,106 @@ import SwiftUI
 struct GuideView: View {
     @ObservedObject var apiClient: APIClient
     @State private var guideSeries: [GuideSeries] = []
-    @State private var filteredSeries: [GuideSeries] = []
     @State private var isLoading = true
     @State private var searchText = ""
     @State private var recordedSeriesIds: Set<String> = []
-    @State private var selectedSeries: GuideSeries?
-    @State private var lastSelectedSeriesId: String?
-    @FocusState private var focusedSeriesId: String?
-    @Environment(\.dismiss) private var dismiss
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 40), count: 4)
+
+    private var filteredSeries: [GuideSeries] {
+        guard !searchText.isEmpty else { return guideSeries }
+        return guideSeries.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+    }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            NavigationStack {
-                ZStack {
-                    if isLoading {
-                        VStack(spacing: 30) {
-                            ProgressView()
-                                .scaleEffect(2)
-                            Text("Loading guide...")
-                                .font(.system(size: 32))
-                        }
-                    } else if filteredSeries.isEmpty {
-                        VStack(spacing: 30) {
-                            Image(systemName: searchText.isEmpty ? "tv" : "magnifyingglass")
-                                .font(.system(size: 100))
-                                .foregroundColor(.gray)
-                            Text(searchText.isEmpty ? "No upcoming programs" : "No results found")
-                                .font(.system(size: 36))
-                                .foregroundColor(.gray)
-                        }
-                    } else {
-                        ScrollView {
-                            LazyVGrid(columns: [
-                                GridItem(.flexible(), spacing: 30),
-                                GridItem(.flexible(), spacing: 30),
-                                GridItem(.flexible(), spacing: 30),
-                                GridItem(.flexible(), spacing: 30)
-                            ], spacing: 30) {
-                                ForEach(filteredSeries) { series in
-                                    Button(action: {
-                                        lastSelectedSeriesId = series.id
-                                        selectedSeries = series
-                                    }) {
-                                        GuideSeriesCard(
-                                            series: series,
-                                            isRecording: recordedSeriesIds.contains(series.id)
-                                        )
-                                    }
-                                    .buttonStyle(.card)
-                                    .focused($focusedSeriesId, equals: series.id)
-                                }
-                            }
-                            .padding(50)
-                        }
-                    }
-                }
-                .navigationTitle("Shows")
-                .searchable(text: $searchText, prompt: "Search shows")
-                .onChange(of: searchText) { _, newValue in
-                    filterSeries(query: newValue)
-                }
-                .onChange(of: selectedSeries) { oldValue, newValue in
-                    // When returning from detail view (newValue becomes nil)
-                    if oldValue != nil && newValue == nil {
-                        // Restore focus to the show we just came from
-                        if let lastId = lastSelectedSeriesId {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                focusedSeriesId = lastId
-                            }
-                        }
-                    }
-                }
-                .navigationDestination(item: $selectedSeries) { series in
-                    GuideDetailView(
-                        series: series,
-                        apiClient: apiClient,
-                        isRecording: recordedSeriesIds.contains(series.id)
+        Group {
+            if isLoading && guideSeries.isEmpty {
+                ProgressView("Loading guide…")
+            } else if filteredSeries.isEmpty {
+                if searchText.isEmpty {
+                    ContentUnavailableView(
+                        "No Upcoming Programs",
+                        systemImage: "calendar",
+                        description: Text("Guide data will appear here once your HDHomeRun has downloaded it.")
                     )
+                } else {
+                    ContentUnavailableView.search(text: searchText)
+                }
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 40) {
+                        ForEach(filteredSeries) { series in
+                            NavigationLink(value: series) {
+                                GuideSeriesCard(
+                                    series: series,
+                                    isRecording: recordedSeriesIds.contains(series.id)
+                                )
+                            }
+                            .buttonStyle(.card)
+                        }
+                    }
+                    .padding(.horizontal, 80)
+                    .padding(.vertical, 40)
                 }
             }
         }
-        .task {
+        .navigationTitle("Guide")
+        .searchable(text: $searchText, prompt: "Search shows")
+        .navigationDestination(for: GuideSeries.self) { series in
+            GuideDetailView(
+                series: series,
+                apiClient: apiClient,
+                isRecording: recordedSeriesIds.contains(series.id)
+            )
+        }
+        .task(id: apiClient.baseURL) {
             await loadGuide()
         }
     }
 
-    private func loadGuide(forceRefresh: Bool = false) async {
+    private func loadGuide() async {
         isLoading = true
+        defer { isLoading = false }
         do {
-            // Load guide and recording rules in parallel
-            async let guideResponse = apiClient.fetchGuide(forceRefresh: forceRefresh)
-            async let recordingRulesResponse = apiClient.fetchRecordingRules()
-
-            let (guide, rules) = try await (guideResponse, recordingRulesResponse)
-
-            await MainActor.run {
-                // Store recorded series IDs
-                recordedSeriesIds = Set(rules.rules.map { $0.seriesId })
-
-                // Group programs by series
-                var seriesDict: [String: GuideSeries] = [:]
-                for channel in guide.channels {
-                    for program in channel.guide {
-                        // Create a new program instance with channel ID
-                        var programWithChannel = program
-                        programWithChannel.channelId = channel.guideNumber
-
-                        if var existingSeries = seriesDict[program.seriesId] {
-                            existingSeries = GuideSeries(
-                                id: existingSeries.id,
-                                title: existingSeries.title,
-                                imageUrl: existingSeries.imageUrl,
-                                programs: existingSeries.programs + [programWithChannel]
-                            )
-                            seriesDict[program.seriesId] = existingSeries
-                        } else {
-                            seriesDict[program.seriesId] = GuideSeries(
-                                id: program.seriesId,
-                                title: program.title,
-                                imageUrl: program.imageUrl,
-                                programs: [programWithChannel]
-                            )
-                        }
-                    }
-                }
-
-                guideSeries = seriesDict.values.sorted { $0.title < $1.title }
-                filteredSeries = guideSeries
-                isLoading = false
-            }
+            async let guideResponse = apiClient.fetchGuide()
+            async let rulesResponse = apiClient.fetchRecordingRules()
+            let (guide, rules) = try await (guideResponse, rulesResponse)
+            recordedSeriesIds = Set(rules.rules.map(\.seriesId))
+            guideSeries = Self.groupBySeries(guide.channels)
         } catch {
-            await MainActor.run {
-                isLoading = false
-            }
+            // The shared connection alert reports the failure.
         }
     }
 
-    private func filterSeries(query: String) {
-        if query.isEmpty {
-            filteredSeries = guideSeries
-        } else {
-            filteredSeries = guideSeries.filter {
-                $0.title.localizedCaseInsensitiveContains(query)
+    /// Flattens the per-channel guide into one entry per series, with each
+    /// series' airings in chronological order and series sorted by title.
+    private static func groupBySeries(_ channels: [GuideChannel]) -> [GuideSeries] {
+        var programsBySeries: [String: [GuideProgram]] = [:]
+        var info: [String: (title: String, imageUrl: String?)] = [:]
+
+        for channel in channels {
+            for program in channel.guide {
+                var stamped = program
+                stamped.channelId = channel.guideNumber
+                programsBySeries[program.seriesId, default: []].append(stamped)
+                if info[program.seriesId] == nil {
+                    info[program.seriesId] = (program.title, program.imageUrl)
+                }
             }
         }
+
+        return programsBySeries.map { seriesId, programs in
+            GuideSeries(
+                id: seriesId,
+                title: info[seriesId]?.title ?? "",
+                imageUrl: info[seriesId]?.imageUrl,
+                programs: programs.sorted { a, b in
+                    if a.startTime != b.startTime { return a.startTime < b.startTime }
+                    return Channel.compareGuideNumbers(a.channelId ?? "", b.channelId ?? "")
+                }
+            )
+        }
+        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 }
 
@@ -164,71 +118,36 @@ struct GuideSeriesCard: View {
     let isRecording: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Series image with recording indicator
-            ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: series.imageUrl ?? "")) { phase in
-                    switch phase {
-                    case .empty:
-                        ZStack {
-                            Color.gray.opacity(0.3)
-                            ProgressView()
-                        }
-                        .frame(height: 200)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(height: 200)
-                            .clipped()
-                    case .failure:
-                        ZStack {
-                            Color.gray.opacity(0.3)
-                            Image(systemName: "tv")
-                                .font(.system(size: 50))
-                                .foregroundColor(.gray)
-                        }
-                        .frame(height: 200)
-                    @unknown default:
-                        Color.gray.opacity(0.3)
-                            .frame(height: 200)
+        VStack(alignment: .leading, spacing: 12) {
+            RemoteImage(url: series.imageUrl)
+                .frame(height: 220)
+                .overlay(alignment: .topTrailing) {
+                    if isRecording {
+                        Image(systemName: "record.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.white, .red)
+                            .padding(10)
                     }
                 }
-                .cornerRadius(12)
+                .clipShape(.rect(cornerRadius: 12, style: .continuous))
 
-                // Red recording indicator dot
-                if isRecording {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.white, lineWidth: 3)
-                        )
-                        .padding(8)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(series.title)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.headline)
                     .lineLimit(2)
-
-                Text("\(series.upcomingCount) upcoming \(series.upcomingCount == 1 ? "episode" : "episodes")")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-
-                if let firstProgram = series.programs.first {
-                    Text("Next: \(firstProgram.formattedStartTime)")
-                        .font(.system(size: 15))
-                        .foregroundColor(.blue)
+                Text("\(series.upcomingCount) upcoming \(series.upcomingCount == 1 ? "airing" : "airings")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let next = series.programs.first {
+                    Text("Next: \(next.formattedStartTime)")
+                        .font(.caption)
+                        .foregroundStyle(.tint)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(15)
-        .shadow(radius: 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
     }
 }

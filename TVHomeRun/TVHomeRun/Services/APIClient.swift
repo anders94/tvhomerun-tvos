@@ -13,6 +13,8 @@ enum APIError: Error, LocalizedError {
     case networkError(Error)
     case decodingError(Error)
     case serverError(Int)
+    /// The server answered with an error body of the form {"error": ..., "details": ...}.
+    case serverRejected(status: Int, message: String)
     case timeout
     case unknown
 
@@ -26,6 +28,8 @@ enum APIError: Error, LocalizedError {
             return "Data parsing error: \(error.localizedDescription)"
         case .serverError(let code):
             return "Server error: \(code)"
+        case .serverRejected(_, let message):
+            return message
         case .timeout:
             return "Connection timeout"
         case .unknown:
@@ -36,6 +40,12 @@ enum APIError: Error, LocalizedError {
 
 // Empty response for requests that don't return data
 struct EmptyResponse: Codable {}
+
+/// Error body the backend sends with non-2xx responses.
+private struct ServerErrorBody: Decodable {
+    let error: String
+    let details: String?
+}
 
 struct DeleteEpisodeResponse: Codable {
     let success: Bool
@@ -74,7 +84,7 @@ class APIClient: ObservableObject {
     @Published var error: APIError?
     @Published var showErrorAlert = false
 
-    internal var baseURL: String
+    @Published private(set) var baseURL: String
     private let session: URLSession
     private let maxRetries = 3
     private let initialBackoff: TimeInterval = 1.0
@@ -134,9 +144,12 @@ class APIClient: ObservableObject {
     }
 
     func deleteEpisode(episodeId: Int, allowRerecord: Bool = false) async throws -> DeleteEpisodeResponse {
-        let rerecordParam = allowRerecord ? "true" : "false"
+        // Only send the flag when set: the backend reads the query as a string,
+        // and "false" is truthy in JavaScript, so `?rerecord=false` would
+        // tell the HDHomeRun to allow a re-record.
+        let query = allowRerecord ? "?rerecord=true" : ""
         return try await performRequest(
-            endpoint: "/api/episodes/\(episodeId)?rerecord=\(rerecordParam)",
+            endpoint: "/api/episodes/\(episodeId)\(query)",
             method: "DELETE",
             responseType: DeleteEpisodeResponse.self
         )
@@ -277,6 +290,10 @@ class APIClient: ObservableObject {
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
+                if let body = try? JSONDecoder().decode(ServerErrorBody.self, from: data) {
+                    let message = [body.error, body.details].compactMap { $0 }.joined(separator: " ")
+                    throw APIError.serverRejected(status: httpResponse.statusCode, message: message)
+                }
                 throw APIError.serverError(httpResponse.statusCode)
             }
 

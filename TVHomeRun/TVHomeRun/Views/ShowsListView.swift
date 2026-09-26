@@ -2,201 +2,57 @@
 //  ShowsListView.swift
 //  TVHomeRun
 //
-//  View displaying the list of available shows
+//  Recordings tab: grid of recorded shows
 //
 
 import SwiftUI
 
 struct ShowsListView: View {
     @ObservedObject var apiClient: APIClient
-    @EnvironmentObject var userSettings: UserSettings
     @State private var shows: [Show] = []
     @State private var isLoading = true
-    @State private var selectedShow: Show?
-    @State private var showServerSettings = false
-    @State private var showGuide = false
-    @State private var showLive = false
-    @Namespace private var showsNamespace
-    @State private var resetFocus = false
-    @State private var lastSelectedShowId: Int?
-    @FocusState private var focusedShowId: Int?
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 40), count: 4)
 
     var body: some View {
-        ZStack {
-            // Content area (behind header)
-            if isLoading {
-                VStack(spacing: 30) {
-                    ProgressView()
-                        .scaleEffect(2)
-                    Text("Loading shows...")
-                        .font(.system(size: 32))
-                }
+        Group {
+            if isLoading && shows.isEmpty {
+                ProgressView("Loading shows…")
             } else if shows.isEmpty {
-                VStack(spacing: 30) {
-                    Image(systemName: "tv.slash")
-                        .font(.system(size: 100))
-                        .foregroundColor(.gray)
-                    Text("No shows available")
-                        .font(.system(size: 36))
-                        .foregroundColor(.gray)
-                }
+                ContentUnavailableView(
+                    "No Recordings",
+                    systemImage: "tv.slash",
+                    description: Text("Recorded shows will appear here once your HDHomeRun has recorded something.")
+                )
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            // Spacer to push content below header
-                            Color.clear
-                                .frame(height: 140)
-
-                            LazyVGrid(columns: [
-                                GridItem(.flexible(), spacing: 30),
-                                GridItem(.flexible(), spacing: 30),
-                                GridItem(.flexible(), spacing: 30),
-                                GridItem(.flexible(), spacing: 30)
-                            ], spacing: 30) {
-                                ForEach(shows) { show in
-                                Button(action: {
-                                    lastSelectedShowId = show.id
-                                    selectedShow = show
-                                }) {
-                                    ShowCardView(show: show)
-                                        .padding(8)
-                                }
-                                .buttonStyle(.card)
-                                .id(show.id)
-                                .focused($focusedShowId, equals: show.id)
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 40) {
+                        ForEach(shows) { show in
+                            NavigationLink(value: show) {
+                                ShowCardView(show: show)
                             }
-                        }
-                        .padding(50)
+                            .buttonStyle(.card)
                         }
                     }
-                    .id(resetFocus)
-                    .onAppear {
-                        // Restore focus when view appears
-                        DispatchQueue.main.async {
-                            if let lastId = lastSelectedShowId {
-                                // Restore to last selected show
-                                proxy.scrollTo(lastId, anchor: .center)
-                                focusedShowId = lastId
-                            } else if let firstShow = shows.first {
-                                // Focus first show if no saved position
-                                focusedShowId = firstShow.id
-                            }
-                        }
-                    }
-                    .onChange(of: selectedShow) { oldValue, newValue in
-                        // When returning from episodes (newValue becomes nil)
-                        if oldValue != nil && newValue == nil {
-                            DispatchQueue.main.async {
-                                if let lastId = lastSelectedShowId {
-                                    proxy.scrollTo(lastId, anchor: .center)
-                                    focusedShowId = lastId
-                                } else if let firstShow = shows.first {
-                                    focusedShowId = firstShow.id
-                                }
-                            }
-                        }
-                    }
+                    .padding(.horizontal, 80)
+                    .padding(.vertical, 40)
                 }
             }
-
-            // Header overlay with buttons
-            VStack {
-                HStack {
-                    Button(action: {
-                        showGuide = true
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 40))
-                            .frame(width: 80, height: 80)
-                    }
-
-                    Button(action: {
-                        showLive = true
-                    }) {
-                        Image(systemName: "tv")
-                            .font(.system(size: 40))
-                            .frame(width: 80, height: 80)
-                    }
-
-                    Spacer()
-
-                    Text("TVHomeRun")
-                        .font(.system(size: 56, weight: .bold))
-
-                    Spacer()
-
-                    Button(action: {
-                        showServerSettings = true
-                    }) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 40))
-                            .frame(width: 80, height: 80)
-                    }
-                }
-                .padding(.horizontal, 50)
-                .padding(.vertical, 30)
-                .background(.ultraThinMaterial)
-
-                Spacer()
-            }
         }
-        .focusScope(showsNamespace)
-        .navigationDestination(item: $selectedShow) { show in
-            EpisodesListView(apiClient: apiClient, show: show)
+        .navigationTitle("Recordings")
+        .navigationDestination(for: Show.self) { show in
+            ShowDetailView(apiClient: apiClient, show: show)
         }
-        .sheet(isPresented: $showServerSettings) {
-            ServerSetupView(userSettings: userSettings, onSettingsSaved: {
-                showServerSettings = false
-            })
-        }
-        .fullScreenCover(isPresented: $showGuide) {
-            GuideView(apiClient: apiClient)
-        }
-        .fullScreenCover(isPresented: $showLive) {
-            LiveChannelsView(apiClient: apiClient)
-        }
-        .alert("Connection Error", isPresented: $apiClient.showErrorAlert) {
-            Button("OK") {
-                apiClient.clearError()
-            }
-            Button("Retry") {
-                Task {
-                    await loadShows()
-                }
-            }
-        } message: {
-            if let error = apiClient.error {
-                Text(error.localizedDescription)
-            }
-        }
-        .task {
+        .task(id: apiClient.baseURL) {
             await loadShows()
-        }
-        .onChange(of: isLoading) { oldValue, newValue in
-            if !newValue && !shows.isEmpty {
-                // Set initial focus to first show when shows finish loading
-                DispatchQueue.main.async {
-                    if lastSelectedShowId == nil, let firstShow = shows.first {
-                        focusedShowId = firstShow.id
-                    }
-                }
-            }
         }
     }
 
     private func loadShows() async {
         isLoading = true
-        do {
-            let fetchedShows = try await apiClient.fetchShows()
-            await MainActor.run {
-                shows = fetchedShows
-                isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                isLoading = false
-            }
+        defer { isLoading = false }
+        if let fetched = try? await apiClient.fetchShows() {
+            shows = fetched
         }
     }
 }
@@ -204,62 +60,33 @@ struct ShowsListView: View {
 struct ShowCardView: View {
     let show: Show
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Show image
-            AsyncImage(url: URL(string: show.imageUrl ?? "")) { phase in
-                switch phase {
-                case .empty:
-                    ZStack {
-                        Color.gray.opacity(0.3)
-                        ProgressView()
-                    }
-                    .frame(height: 200)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(height: 200)
-                        .clipped()
-                case .failure:
-                    ZStack {
-                        Color.gray.opacity(0.3)
-                        Image(systemName: "tv")
-                            .font(.system(size: 50))
-                            .foregroundColor(.gray)
-                    }
-                    .frame(height: 200)
-                @unknown default:
-                    Color.gray.opacity(0.3)
-                        .frame(height: 200)
-                }
-            }
-            .cornerRadius(12)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(show.title)
-                    .font(.system(size: 20, weight: .semibold))
-                    .lineLimit(2)
-
-                HStack {
-                    Text(show.category.capitalized)
-                        .font(.system(size: 16))
-                        .foregroundColor(.secondary)
-
-                    if show.episodeCount > 0 {
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        Text("\(show.episodeCount) episode\(show.episodeCount == 1 ? "" : "s")")
-                            .font(.system(size: 16))
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+    private var subtitle: String {
+        var parts = [show.category.capitalized]
+        if show.episodeCount > 0 {
+            parts.append("\(show.episodeCount) episode\(show.episodeCount == 1 ? "" : "s")")
         }
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(15)
-        .shadow(radius: 4)
+        return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            RemoteImage(url: show.imageUrl)
+                .frame(height: 220)
+                .clipShape(.rect(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(show.title)
+                    .font(.headline)
+                    .lineLimit(2)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
     }
 }
