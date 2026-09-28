@@ -15,17 +15,12 @@ struct GuideDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
-                HStack(spacing: 30) {
-                    Text(series.title)
-                        .font(.title)
-                        .lineLimit(1)
-                    Spacer()
-                    RecordSeriesToggle(
-                        seriesId: series.id,
-                        apiClient: apiClient,
-                        assumeRecording: isRecording
-                    )
-                }
+                // The page title comes from .navigationTitle, which tvOS renders above the content.
+                RecordSeriesToggle(
+                    seriesId: series.id,
+                    apiClient: apiClient,
+                    assumeRecording: isRecording
+                )
 
                 Text("Upcoming Airings")
                     .font(.title3)

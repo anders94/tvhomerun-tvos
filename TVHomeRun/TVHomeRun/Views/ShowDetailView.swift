@@ -148,12 +148,9 @@ struct ShowDetailView: View {
         .defaultFocus($focus, displayedEpisodes.first.map { Focus.episode($0.id) })
     }
 
+    // The page title comes from .navigationTitle, which tvOS renders above the content.
     private var header: some View {
         HStack(spacing: 30) {
-            Text(show.title)
-                .font(.title)
-                .lineLimit(1)
-            Spacer()
             RecordSeriesToggle(seriesId: show.seriesId, apiClient: apiClient)
             EpisodeSortMenu(
                 seasonOrder: $seasonOrder,

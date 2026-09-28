@@ -81,7 +81,8 @@ struct ServerConnectionForm: View {
                 Label("Not connected", systemImage: "circle.dashed")
                     .foregroundStyle(.secondary)
             } else {
-                LabeledContent("Connected to", value: userSettings.serverURL)
+                // Not verified yet on this screen; just show what is saved.
+                LabeledContent("Saved server", value: userSettings.serverURL)
             }
         case .checking:
             Label("Checking connection…", systemImage: "ellipsis.circle")
