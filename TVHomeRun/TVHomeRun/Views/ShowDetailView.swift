@@ -127,7 +127,7 @@ struct ShowDetailView: View {
         VStack(alignment: .leading, spacing: 30) {
             header
 
-            HStack(alignment: .top, spacing: 40) {
+            HStack(alignment: .top, spacing: 0) {
                 if let groups = seasonGroups {
                     SeasonSidebar(groups: groups, selected: currentSeason, focus: $focus) { key in
                         selectedSeason = key
@@ -176,6 +176,9 @@ struct ShowDetailView: View {
                     }
                 }
             }
+            // A scroll view clips to its bounds, and the card style scales the
+            // focused row up. Inset the rows so the lift and shadow fit inside.
+            .padding(.horizontal, 50)
             .padding(.vertical, 20)
             .padding(.bottom, 60)
         }
