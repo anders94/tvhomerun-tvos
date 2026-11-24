@@ -107,6 +107,15 @@ struct Episode: Codable, Identifiable, Equatable {
         watched > 0
     }
 
+    /// Stopping during the closing credits still counts as watched: at least
+    /// 90% through, or within the last 3 minutes. The half-way floor keeps the
+    /// 3-minute rule from swallowing very short recordings.
+    static func isMostlyWatched(position: Int, duration: Int) -> Bool {
+        guard duration > 0, position > 0 else { return false }
+        let fraction = Double(position) / Double(duration)
+        return fraction >= 0.9 || (duration - position <= 180 && fraction >= 0.5)
+    }
+
     var formattedAirDate: String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

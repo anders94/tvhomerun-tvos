@@ -7,10 +7,12 @@
 
 import SwiftUI
 
-struct ServerConnectionForm: View {
+struct ServerConnectionForm<ExtraSections: View>: View {
     @EnvironmentObject private var userSettings: UserSettings
-    var showsAppInfo = false
+    var showsAppInfo: Bool
     var onConnected: (String) -> Void
+    /// Sections shown between the connection status and About.
+    @ViewBuilder var extraSections: ExtraSections
 
     @State private var urlInput = ""
     @State private var status: Status = .idle
@@ -56,6 +58,8 @@ struct ServerConnectionForm: View {
                 statusRow
             }
 
+            extraSections
+
             if showsAppInfo {
                 Section("About") {
                     LabeledContent("Version", value: appVersion)
@@ -67,6 +71,16 @@ struct ServerConnectionForm: View {
                 urlInput = userSettings.serverURL.isEmpty ? "http://" : userSettings.serverURL
             }
         }
+    }
+
+    init(
+        showsAppInfo: Bool = false,
+        onConnected: @escaping (String) -> Void,
+        @ViewBuilder extraSections: () -> ExtraSections
+    ) {
+        self.showsAppInfo = showsAppInfo
+        self.onConnected = onConnected
+        self.extraSections = extraSections()
     }
 
     private var canConnect: Bool {
@@ -133,5 +147,11 @@ struct ServerConnectionForm: View {
         } catch {
             status = .failed("Unable to connect: \(error.localizedDescription)")
         }
+    }
+}
+
+extension ServerConnectionForm where ExtraSections == EmptyView {
+    init(showsAppInfo: Bool = false, onConnected: @escaping (String) -> Void) {
+        self.init(showsAppInfo: showsAppInfo, onConnected: onConnected) { EmptyView() }
     }
 }

@@ -41,6 +41,18 @@ enum APIError: Error, LocalizedError {
 // Empty response for requests that don't return data
 struct EmptyResponse: Codable {}
 
+/// Server-side preferences, shared by every client of the backend.
+struct ServerSettings: Codable, Equatable {
+    /// Delete watched episodes that haven't been played for `autoDeleteAfterDays`.
+    var autoDeleteWatched: Bool
+    var autoDeleteAfterDays: Int
+
+    enum CodingKeys: String, CodingKey {
+        case autoDeleteWatched = "auto_delete_watched"
+        case autoDeleteAfterDays = "auto_delete_after_days"
+    }
+}
+
 /// Error body the backend sends with non-2xx responses.
 private struct ServerErrorBody: Decodable {
     let error: String
@@ -152,6 +164,22 @@ class APIClient: ObservableObject {
             endpoint: "/api/episodes/\(episodeId)\(query)",
             method: "DELETE",
             responseType: DeleteEpisodeResponse.self
+        )
+    }
+
+    // MARK: - Settings
+
+    func fetchSettings() async throws -> ServerSettings {
+        try await performRequest(endpoint: "/api/settings", responseType: ServerSettings.self)
+    }
+
+    @discardableResult
+    func updateSettings(_ settings: ServerSettings) async throws -> ServerSettings {
+        try await performRequest(
+            endpoint: "/api/settings",
+            method: "PUT",
+            body: settings,
+            responseType: ServerSettings.self
         )
     }
 
@@ -306,12 +334,19 @@ class APIClient: ObservableObject {
             }
 
         } catch let error as APIError {
-            // Don't retry DELETE requests or decoding errors (not idempotent)
-            let isDecodingError = {
-                if case .decodingError = error { return true }
-                return false
+            // Don't retry DELETE requests (not idempotent), decoding errors, or
+            // 4xx responses: the same request will be rejected the same way.
+            let isPermanent: Bool = {
+                switch error {
+                case .decodingError:
+                    return true
+                case .serverError(let status), .serverRejected(let status, _):
+                    return (400..<500).contains(status)
+                default:
+                    return false
+                }
             }()
-            let shouldRetry = method != "DELETE" && !isDecodingError
+            let shouldRetry = method != "DELETE" && !isPermanent
 
             // Already an APIError, check if we should retry
             if shouldRetry && retryCount < maxRetries {

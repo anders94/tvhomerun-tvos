@@ -13,6 +13,8 @@ struct SettingsView: View {
     var body: some View {
         ServerConnectionForm(showsAppInfo: true) { url in
             apiClient.updateBaseURL(url)
+        } extraSections: {
+            AutoDeleteSection(apiClient: apiClient)
         }
         .navigationTitle("Settings")
     }

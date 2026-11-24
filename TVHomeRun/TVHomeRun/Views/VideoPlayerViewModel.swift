@@ -23,12 +23,16 @@ class VideoPlayerViewModel: ObservableObject {
     private var endObserver: AnyCancellable?
     private var progressSaveObserver: Any?
     private var lastSavedPosition = 0
+    /// Once an episode counts as watched it stays watched for this session,
+    /// so seeking back to rewatch a bit doesn't clear the flag.
+    private var currentEpisodeWatched: Bool
     private var hasSetup = false
 
     init(episode: Episode, allEpisodes: [Episode], apiClient: APIClient) {
         self.currentEpisode = episode
         self.allEpisodes = allEpisodes
         self.apiClient = apiClient
+        self.currentEpisodeWatched = episode.isWatched
     }
 
     var hasNextEpisode: Bool {
@@ -47,6 +51,7 @@ class VideoPlayerViewModel: ObservableObject {
               index < allEpisodes.count - 1 else { return }
         let next = allEpisodes[index + 1]
         currentEpisode = next
+        currentEpisodeWatched = next.isWatched
         lastSavedPosition = 0
         setupPlayer(with: next)
     }
@@ -129,15 +134,28 @@ class VideoPlayerViewModel: ObservableObject {
     // MARK: - Progress
 
     private func saveProgressToServer() async {
-        let currentTime = Int(player.currentTime().seconds)
-
-        // Skip tiny moves and the final 30 seconds (the end observer marks it watched).
-        guard currentTime > 0, abs(currentTime - lastSavedPosition) >= 5 else { return }
+        let seconds = player.currentTime().seconds
         let duration = player.currentItem?.duration.seconds ?? 0
-        guard duration.isFinite, currentTime < Int(duration) - 30 else { return }
+        guard seconds.isFinite, duration.isFinite, duration > 0 else { return }
+        let currentTime = Int(seconds)
+
+        // Skip tiny moves.
+        guard currentTime > 0, abs(currentTime - lastSavedPosition) >= 5 else { return }
+
+        // Judge "watched" against the scheduled length the backend uses, not
+        // the file's: recordings run ~30s long, which would push the 90% mark
+        // past where people usually stop during the credits.
+        let scheduledDuration = currentEpisode.duration > 0 ? currentEpisode.duration : Int(duration)
+        if Episode.isMostlyWatched(position: currentTime, duration: scheduledDuration) {
+            currentEpisodeWatched = true
+        }
 
         do {
-            try await apiClient.updateEpisodeProgress(episodeId: currentEpisode.id, position: currentTime, watched: false)
+            try await apiClient.updateEpisodeProgress(
+                episodeId: currentEpisode.id,
+                position: currentTime,
+                watched: currentEpisodeWatched
+            )
             lastSavedPosition = currentTime
         } catch {
             // Never interrupt playback over a failed progress save.
@@ -145,6 +163,7 @@ class VideoPlayerViewModel: ObservableObject {
     }
 
     private func markAsWatched() async {
+        currentEpisodeWatched = true
         let duration = Int(player.currentItem?.duration.seconds ?? 0)
         try? await apiClient.updateEpisodeProgress(episodeId: currentEpisode.id, position: duration, watched: true)
     }
